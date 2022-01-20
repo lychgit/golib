@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -211,4 +212,93 @@ func FloatScale(f float64, scale , roundMode int) float64 {
 		_f = f
 	}
 	return _f
+}
+
+// 获取数组中某个字段的值的构成的数组指针
+func ArrayColumn(array interface{}, columnKey string) ([] interface{}, error) {
+	val := reflect.ValueOf(array)
+	if val.Kind() == reflect.Slice {
+		datas := make([]interface{}, 0)
+		for i := 0; i < val.Len(); i++ {
+			item := GetStructColumnValueByColumnKey(val.Index(i).Interface(), columnKey)
+			datas = append(datas, item)
+		}
+		return datas, nil
+	} else {
+		return nil, errors.New("参数错误, 查找对象并非数组类型")
+	}
+}
+
+// 获取数组中某个字段的值(string 类型)的构成的数组指针
+func ArrayStringColumn(array interface{}, columnKey string) ([] string, error) {
+	val := reflect.ValueOf(array)
+	if val.Kind() == reflect.Slice {
+		datas := make([]string, 0)
+		for i := 0; i < val.Len(); i++ {
+			item := GetStructColumnValueByColumnKey(val.Index(i).Interface(), columnKey)
+			datas = append(datas, item.(string))
+		}
+		return datas, nil
+	} else {
+		return nil, errors.New("参数错误, 查找对象并非数组类型")
+	}
+}
+
+// Get Struct column value by (struct column) key
+// data should be a Struct or a (Struct) Ptr
+func GetStructColumnValueByColumnKey(data interface{}, columnKey string) interface{} {
+	val := reflect.ValueOf(data)
+	if val.Kind() == reflect.Ptr || val.Kind() == reflect.Struct {
+		elem := val.Elem() //获取结构体中个字段的值
+		for i := 0; i < elem.NumField(); i++ {
+			structField := elem.Type().Field(i) //结构体字段对应的值
+			if structField.Tag.Get("json") == columnKey || structField.Name == columnKey {
+				return elem.FieldByName(structField.Name).Interface()
+			}
+		}
+	}
+	return nil
+}
+
+// map数组中的值根据需要使用类型断言转换 columnKey需是唯一值不重复
+func GetSliceColumnMapArray(data interface{}, columnKey string) (map[string]interface{}, error) {
+	val := reflect.ValueOf(data)
+	if val.Kind() == reflect.Slice {
+		dMap := make(map[string]interface{})
+		for i := 0; i < val.Len(); i++ {
+			v := val.Index(i).Interface()
+			keyValue := GetStructColumnValueByColumnKey(v, columnKey)
+			dMap[ToString(keyValue)] = v
+		}
+		return dMap, nil
+	} else {
+		return nil, errors.New("参数错误, 查找对象并非数组类型")
+	}
+}
+
+// 根据数组中某个字段的值分组  返回的是多个数组映射
+func GroupingMapDataByColumnKeyValue(data interface{}, columnKey string) (map[string][]interface{}, error) {
+	val := reflect.ValueOf(data)
+	if val.Kind() == reflect.Map {
+		dMap := make(map[string][]interface{},0)
+		mapKeys := val.MapKeys()
+		for _, k := range mapKeys {
+			v := val.MapIndex(k).Interface()
+			keyValue := GetStructColumnValueByColumnKey(v, columnKey)
+			mk := ToString(keyValue)
+			if d, ok := dMap[mk]; ok {
+				dMap[mk] = append(d, v)
+			} else {
+				dMap[mk] = []interface{}{v}
+			}
+		}
+		return dMap, nil
+	} else {
+		return nil, errors.New("参数错误, 查找对象并非数组类型")
+	}
+}
+
+func GetKindOfData(data interface{}) string {
+	v := reflect.ValueOf(data)
+	return v.Kind().String()
 }

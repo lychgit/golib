@@ -22,8 +22,8 @@ type RedisCache struct {
 var ctx = context.Background()
 
 // 生成redis缓存操作接口
-func NewRedisCacher (Options redis.Options) (RedisCacher, error)  {
-	rdb := redis.NewClient(&Options)
+func NewRedisCacher (Options *redis.Options) (RedisCacher, error)  {
+	rdb := redis.NewClient(Options)
 	if rdb == nil {
 		return nil, errors.New("redis服务器连接失败")
 	}
